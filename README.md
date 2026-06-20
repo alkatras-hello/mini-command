@@ -20,3 +20,15 @@ sed -i 's/\r$//' install.sh
 
 # Run the master installer
 bash install.sh
+#🪓 Uninstallation
+​To completely wipe all installed global binaries from your system:
+sed -i 's/\r$//' uninstall.sh
+bash uninstall.sh
+#💻 Quick Usage Reference
+​🗜️ 1. pkg-press
+​Compress file: pkg-press c f filename.txt
+​Compress folder: pkg-press c d my_folder
+​Decompress: pkg-press x f archive.txt.xz
+​🌐 2. status-net
+​Run diagnostics & scan router ports: status-net
+​The script will prompt you for a target IP or use the default gateway automatically.
