@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ==============================================================================
-# STATUS-NET - Official Uninstaller
+# STATUS-NET  Uninstaller
 # Developed by: alkatras-hello
 # ==============================================================================
 
 echo "🧹 Removing Status-Net from your system..."
 
-# Перевіряємо, чи є такий файл у системі, і зносимо його
+
 if [ -f "/usr/local/bin/status_net" ]; then
     sudo rm -f /usr/local/bin/status_net
     echo "✅ Success: status-net command has been removed."
