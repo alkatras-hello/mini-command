@@ -6,7 +6,7 @@ import time
 
 # ==============================================================================
 # YOURLAND v0.7 - Persistent Config Desktop with Global System Menu
-# Developed by: alkatras-hello & Gemini (Dev/QA Team)
+# Developed by: alkatras-hello
 # ==============================================================================
 
 CONFIG_FILE = "yourland_config.txt"
