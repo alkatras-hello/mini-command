@@ -7,7 +7,7 @@
 
 # 1. Check for root privileges (required to remove files from /usr/local/bin)
 if [ "$EUID" -ne 0 ]; then
-    echo "❌ Bro, run this uninstaller with sudo: sudo bash uninstall-.sh"
+    echo "❌ Bro, run this uninstaller with sudo: sudo bash uninstall.sh"
     exit 1
 fi
 
