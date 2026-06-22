@@ -4,6 +4,7 @@
 # FAKE-WIFI-DEVICE - Virtual Wi-Fi Simulator with MAC/IP Rotation & Tor Proxy
 # Developed by: alkatras-hello
 #
+# HARD REGENERATION MODE ACTIVE - Wiping kernel modules on each cycle to beat WIPS
 # ==============================================================================
 
 if [ "$EUID" -ne 0 ]; then
@@ -41,63 +42,77 @@ generate_noise_traffic() {
 }
 
 rotate_loop() {
-    sleep 2
-    IFACES=$(ip link show | grep -o -E "wlan[0-9]+")
-
-    if [ -z "$IFACES" ]; then
-        echo "[$(date '+%H:%M:%S')] ⚠️ No wlan interfaces found for rotation." >> /var/log/fake-wifi.log
-        exit 1
-    fi
-
     echo "[$(date '+%H:%M:%S')] 🚀 Fake Wi-Fi daemon successfully started!" >> /var/log/fake-wifi.log
-    for iface in $IFACES; do
-        CURRENT_MAC=$(ip link show "$iface" | awk '/link\/ether/ {print $2}')
-        echo "[$(date '+%H:%M:%S')] 📡 Monitoring interface: $iface (Initial MAC: $CURRENT_MAC)" >> /var/log/fake-wifi.log
-    done
-    echo "[$(date '+%H:%M:%S')] ⏳ Next rotation in 20 minutes..." >> /var/log/fake-wifi.log
+    echo "[$(date '+%H:%M:%S')] ⏳ Hard regeneration cycle: 20 minutes interval..." >> /var/log/fake-wifi.log
 
     while true; do
-        # 20 хвилин сну (1200 секунд)
+        # 20 хвилин сну (1200 секунд) перед жорстким релоадом модуля
         sleep 1200
 
-        MSG="⚠️ Attention! Rotating MAC, IP, Hostname, and Tor Identity NOW..."
+        MSG="⚠️ Attention! HARD REGENERATION of kernel interfaces and wireless devices NOW..."
         echo "[$(date '+%H:%M:%S')] $MSG" >> /var/log/fake-wifi.log
 
+        # Звукові сигнали в TTY
         printf "\a" > /dev/tty1 2>/dev/null
         printf "\a" > /dev/tty3 2>/dev/null
 
+        # Надсилання сповіщення на робочий стіл поточного користувача
         CURRENT_USER=$(who | awk '{print $1}' | head -n1)
         USER_ID=$(id -u "$CURRENT_USER")
         DBUS_LAUNCH="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus"
         sudo -u "$CURRENT_USER" $DBUS_LAUNCH notify-send "Fake Wi-Fi & Tor" "$MSG" &>/dev/null
 
+        # Оновлюємо ланцюжок Tor, якщо сервіс активний
         if systemctl is-active --quiet tor; then
             systemctl reload tor &>/dev/null
             echo "[$(date '+%H:%M:%S')] 🧅 Tor identity refreshed (New external WAN IP requested)." >> /var/log/fake-wifi.log
         fi
 
-        # --- ОНОВЛЕНА МУТАЦІЯ МЕРЕЖІ ---
+        # -----------------------------------------------------------------
+        # КРОК 1: ЖОРСТКЕ ЗНЕСЕННЯ СТАРИХ ІНТЕРФЕЙСІВ З ЯДРА (Нищимо старі ID)
+        # -----------------------------------------------------------------
+        echo "[$(date '+%H:%M:%S')] 🧹 Unloading mac80211_hwsim to wipe previous system IDs..." >> /var/log/fake-wifi.log
+        modprobe -r mac80211_hwsim &>/dev/null
+        sleep 2
+
+        # -----------------------------------------------------------------
+        # КРОК 2: ПОВНЕ ПЕРЕРОДЖЕННЯ (Створення абсолютно нових карт)
+        # -----------------------------------------------------------------
+        echo "[$(date '+%H:%M:%S')] 🧬 Loading fresh module with 4 new hardware structures..." >> /var/log/fake-wifi.log
+        if ! modprobe mac80211_hwsim radios=4; then
+            echo "[$(date '+%H:%M:%S')] ❌ FAILED to reload kernel module! Waiting for next cycle..." >> /var/log/fake-wifi.log
+            continue
+        fi
+        sleep 2
+
+        # Зчитуємо щойно створені інтерфейси, бо їхні внутрішні індекси в ядрі змінилися!
+        IFACES=$(ip link show | grep -o -E "wlan[0-9]+")
+
+
+        # -----------------------------------------------------------------
+        # КРОК 3: НАЛАШТУВАННЯ НОВИХ МУТАЦІЙ ТА ШУМУ
+        # -----------------------------------------------------------------
         for iface in $IFACES; do
             NEW_MAC=$(generate_random_mac)
             NEW_IP=$(generate_random_ip)
             NEW_HOST=$(generate_random_hostname)
 
-            # Наднизький рівень: міняємо MAC, IP та Hostname для інтерфейсу
+            # Ініціалізуємо свіжу карту на низькому рівні
             ip link set dev "$iface" down
             ip link set dev "$iface" address "$NEW_MAC"
-            ip addr flush dev "$iface"
+            ip addr flush dev "$iface" &>/dev/null
             ip addr add "$NEW_IP/24" dev "$iface"
 
-            # Зміна hostname суто для цього мережевого запиту через sysctl (якщо підтримується)
+            # Маскування ізоляції запитів
             sysctl -w net.ipv4.conf."$iface".arp_ignore=1 &>/dev/null
-
             ip link set dev "$iface" up
 
-            # Запуск фонового шуму для обману систем стеження (DPI) провайдера
+            # Емулюємо життєдіяльність пристрою для генерації фонового шуму
             generate_noise_traffic "$iface"
 
-            echo "[$(date '+%H:%M:%S')] 🔄 $iface updated -> MAC: $NEW_MAC | IP: $NEW_IP | Host: $NEW_HOST" >> /var/log/fake-wifi.log
+            echo "[$(date '+%H:%M:%S')] ✨ New Hardware Node $iface -> MAC: $NEW_MAC | IP: $NEW_IP | Host: $NEW_HOST" >> /var/log/fake-wifi.log
         done
+        echo "[$(date '+%H:%M:%S')] ⏳ Next hard regeneration in 20 minutes..." >> /var/log/fake-wifi.log
     done
 }
 
@@ -116,7 +131,7 @@ case "$1" in
         fi
         echo "🚀 Creating fake Wi-Fi devices..."
 
-        # Збільшуємо кількість радіо-інтерфейсів до 4 для створення більшої маси фейків!
+        # Первинне завантаження 4 віртуальних радіо-інтерфейсів
         if modprobe mac80211_hwsim radios=4; then
             echo "✅ Kernel module mac80211_hwsim loaded with 4 virtual radios."
 
@@ -133,14 +148,15 @@ case "$1" in
                 fi
             fi
 
+            # Запускаємо безкінечний цикл жорсткої регенерації у фоні
             rotate_loop >> /var/log/fake-wifi.log 2>&1 &
             echo $! > "$PID_FILE"
 
             echo "--------------------------------------------------"
-            echo "🔄 Rotation daemon started in background (Interval: 20 min)."
-            echo "📝 Logs available at: /var/log/fake-wifi.log"
+            echo "🔄 Hard Regeneration daemon started (Interval: 20 min)."
+            echo "📝 Watch real-time changes: tail -f /var/log/fake-wifi.log"
             echo "--------------------------------------------------"
-            echo "🎉 PRIVACY MODE ACTIVE: 4 Virtual devices are mutating!"
+            echo "🎉 PRIVACY COMPLIANCE: 4 Hardware nodes are ready to morph!"
         else
             echo "❌ FAILED to load mac80211_hwsim module."
         fi
